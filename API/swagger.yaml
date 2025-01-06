@@ -1,0 +1,285 @@
+openapi: 3.0.0
+info:
+  title: Flower Shop API
+  description: API для управления цветочным магазином, включая заказы, букеты, клиентов и доставки.
+  version: 1.0.0
+servers:
+  - url: https://api.flowershop.com/v1
+paths:
+  /bouquets:
+    get:
+      summary: Получить список доступных букетов
+      description: Получение всех доступных букетов с их деталями.
+      tags:
+        - Букеты
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Bearer-токен для аутентификации
+      responses:
+        '200':
+          description: Список букетов
+          headers:
+            Cache-Control:
+              description: Настройки кэширования для ответа
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    bouquet_id:
+                      type: integer
+                      description: Уникальный идентификатор букета (из таблицы `bouquet.bouquet_id`)
+                    name:
+                      type: string
+                      description: Название букета (из таблицы `bouquet.name`)
+                    description:
+                      type: string
+                      description: Описание букета (из таблицы `bouquet.description`)
+                    price:
+                      type: number
+                      format: float
+                      description: Цена букета (из таблицы `bouquet.price`)
+                    is_available:
+                      type: boolean
+                      description: Статус доступности букета (из таблицы `bouquet.is_available`)
+        '401':
+          description: Доступ запрещен
+      x-algorithm:
+        validation:
+          - Проверить наличие и валидность заголовка Authorization.
+        processing:
+          - Запросить таблицу `bouquet` для получения доступных букетов.
+        tables:
+          - bouquet
+  /orders:
+    post:
+      summary: Создать новый заказ
+      description: Размещение нового заказа для клиента.
+      tags:
+        - Заказы
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                client_id:
+                  type: integer
+                  description: ID клиента, размещающего заказ (проверяется в таблице `client.client_id`)
+                  example: 123
+                shopping_cart_id:
+                  type: integer
+                  description: ID корзины покупок, связанной с заказом (проверяется в таблице `shopping_cart.shopping_cart_id`)
+                  example: 456
+                payment_type_id:
+                  type: integer
+                  description: ID типа оплаты (проверяется в таблице `payment_type.payment_type_id`)
+                  example: 2
+                order_delivery:
+                  type: object
+                  properties:
+                    delivery_address:
+                      type: string
+                      description: Адрес доставки для заказа
+                      example: "ул. Цветочная, 123"
+                    courier_id:
+                      type: integer
+                      description: ID курьера, доставляющего заказ (проверяется в таблице `courier.courier_id`)
+                      example: 3
+              required:
+                - client_id
+                - shopping_cart_id
+                - payment_type_id
+      responses:
+        '201':
+          description: Заказ успешно создан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  order_id:
+                    type: integer
+                    description: Уникальный идентификатор созданного заказа (из таблицы `order.order_id`)
+                    example: 789
+        '400':
+          description: Неверный запрос - ошибка валидации
+      x-algorithm:
+        validation:
+          - Проверить наличие всех обязательных полей.
+          - Проверить, что `client_id`, `shopping_cart_id`, `payment_type_id` и `courier_id` существуют в соответствующих таблицах.
+        processing:
+          - Создать новую запись в таблице `order`.
+          - При необходимости связать с таблицами `order_delivery` и `order_payment`.
+        tables:
+          - client
+          - shopping_cart
+          - payment_type
+          - order
+          - order_delivery
+  /clients:
+    post:
+      summary: Зарегистрировать нового клиента
+      description: Создание новой учетной записи клиента в системе.
+      tags:
+        - Клиенты
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  description: Имя пользователя для клиента (должно быть уникальным в таблице `client.username`)
+                  example: "johndoe"
+                mobile_phone:
+                  type: string
+                  description: Номер мобильного телефона клиента
+                  example: "+1234567890"
+                email:
+                  type: string
+                  description: Электронная почта клиента (должна быть уникальной в таблице `client.email`)
+                  example: "john.doe@example.com"
+                password:
+                  type: string
+                  description: Пароль для учетной записи клиента
+                  example: "securepassword123"
+              required:
+                - username
+                - mobile_phone
+                - email
+                - password
+      responses:
+        '201':
+          description: Клиент успешно создан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  client_id:
+                    type: integer
+                    description: Уникальный идентификатор созданного клиента (из таблицы `client.client_id`)
+                    example: 101
+        '400':
+          description: Неверный запрос - ошибка валидации
+      x-algorithm:
+        validation:
+          - Проверить наличие всех обязательных полей.
+          - Убедиться, что `username` и `email` уникальны.
+        processing:
+          - Вставить новую запись в таблицу `client`.
+        tables:
+          - client
+  /promocodes:
+    get:
+      summary: Проверить промокод
+      description: Проверить валидность промокода и вернуть его детали.
+      tags:
+        - Промокоды
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Bearer-токен для аутентификации
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Промокод для проверки
+      responses:
+        '200':
+          description: Детали промокода
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  promocode_id:
+                    type: integer
+                    description: Уникальный идентификатор промокода (из таблицы `promocode.promocode_id`)
+                    example: 15
+                  discount_percentage:
+                    type: number
+                    format: float
+                    description: Процент скидки по промокоду (из таблицы `promocode.discount_percentage`)
+                    example: 10.5
+                  is_valid:
+                    type: boolean
+                    description: Является ли промокод действительным
+                    example: true
+        '404':
+          description: Промокод не найден
+        '401':
+          description: Доступ запрещен
+      x-algorithm:
+        validation:
+          - Проверить наличие и валидность заголовка Authorization.
+          - Проверить, что промокод существует и находится в пределах срока действия.
+        processing:
+          - Запросить таблицу `promocode` для соответствующего кода.
+        tables:
+          - promocode
+  /orders/{order_id}/status:
+    get:
+      summary: Получить статус заказа
+      description: Получить статус заказа по его идентификатору.
+      tags:
+        - Заказы
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Bearer-токен для аутентификации
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Уникальный идентификатор заказа
+          example: 789
+      responses:
+        '200':
+          description: Детали статуса заказа
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  order_id:
+                    type: integer
+                    description: Уникальный идентификатор заказа (из таблицы `order.order_id`)
+                    example: 789
+                  status:
+                    type: string
+                    description: Текущий статус заказа (из таблицы `order_status.name`)
+                    example: "В обработке"
+        '404':
+          description: Заказ не найден
+        '401':
+          description: Доступ запрещен
+      x-algorithm:
+        validation:
+          - Проверить наличие и валидность заголовка Authorization.
+          - Проверить, что `order_id` существует в таблице `order`.
+        processing:
+          - Запросить таблицы `order` и `order_status` для получения статуса заказа.
+        tables:
+          - order
+          - order_status
