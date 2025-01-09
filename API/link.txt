@@ -1,1 +1,1 @@
-Ссылка на swagger https://app.swaggerhub.com/apis/svymynvme4/flowerShop/1.0.0
+Ссылка на swagger https://app.swaggerhub.com/apis-docs/svymynvme4/flowerShop/1.0.0
